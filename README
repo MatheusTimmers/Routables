@@ -1,0 +1,11 @@
+.
+├── config # Configurações da tabela de roteamento
+│   └── router_config.go # Leitura e escrita da tabela no arquivo
+├── go.mod
+├── main.go
+├── protocol # Protocolo de comunicação entre tabelas
+│   └── protocol.go # Arquivo de protocolo principal
+├── README
+└── router # Pacote responsavel pela lógica dos roteadores
+    ├── router.go
+    └── routing_table.go
