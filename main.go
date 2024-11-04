@@ -1,16 +1,21 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"routables/config"
 )
 
 func main() {
-  r, err := config.LoadRouterConfig("roteadores.txt", "192.168.1.1")
-  if (err != nil) {
-    err = fmt.Errorf("Main: Error loading router config file: %w", err)
-    panic(err)
-  }
+	configFile := flag.String("config", "roteadores.txt", "Arquivo de configuração dos vizinhos")
+	routerIP := flag.String("ip", "192.168.1.1", "IP do roteador")
+	flag.Parse()
 
-  fmt.Printf(r.ToString())
+	router, err := config.LoadRouterConfig(*configFile, *routerIP)
+	if err != nil {
+		err = fmt.Errorf("Main: Error loading router config file: %w", err)
+		panic(err)
+	}
+
+	router.Start()
 }
