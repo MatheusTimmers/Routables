@@ -2,13 +2,15 @@ package protocol
 
 import (
 	"fmt"
+	"routables/router"
+	"strings"
 )
 
-func FormatRoutingMessage(routeTable map[string]int) string {
-	var message string = ""
+func FormatRoutingMessage(routeTable map[string]router.Route) string {
+	var builder strings.Builder
 
-	for ip, metric := range routeTable {
-		message += fmt.Sprintf("!%s:%d", ip, metric)
+	for _, route := range routeTable {
+		fmt.Fprintf(&builder, "!%s:%d", route.DestIP, route.Metric)
 	}
-	return message
+	return builder.String()
 }
