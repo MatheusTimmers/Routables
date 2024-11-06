@@ -1,18 +1,21 @@
 package router
 
 import (
-	"errors"
 	"fmt"
-	"net"
-	"strconv"
 	"strings"
 	"sync"
-	"time"
 )
 
 type Router struct {
 	IP         string
 	RouteTable map[string]Route
+	mu         sync.Mutex
+}
+
+type Route struct {
+	DestIP  string
+	Metric  int
+	NextHop string
 }
 
 func NewRouter(ip string) *Router {
@@ -22,7 +25,44 @@ func NewRouter(ip string) *Router {
 	}
 }
 
-func (r Router) Start() {
+func (r *Router) AddRoute(destIP string, metric int, nextHop string) {
+	_, exist := r.RouteTable[destIP]
+	if !exist {
+		r.RouteTable[destIP] = Route{
+			DestIP:  destIP,
+			Metric:  metric,
+			NextHop: nextHop,
+		}
+	}
+}
+
+func (r *Router) UpdateRoute(destIP string, metric int, nextHop string) {
+	route, exist := r.RouteTable[destIP]
+	if (!exist) || (metric < route.Metric) {
+		r.RouteTable[destIP] = Route{
+			DestIP:  destIP,
+			Metric:  metric,
+			NextHop: nextHop,
+		}
+	}
+}
+
+func (r *Router) RemoveRoute(destIP string) {
+	delete(r.RouteTable, destIP)
+}
+
+func (r *Router) ToString() string {
+	var builder strings.Builder
+	fmt.Fprintf(&builder, "Ip: %s\n", r.IP)
+
+	for _, route := range r.RouteTable {
+		fmt.Fprintf(&builder, "   route: %v\n", route)
+	}
+
+	return builder.String()
+}
+
+func (r *Router) Start() {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
@@ -37,125 +77,4 @@ func (r Router) Start() {
 	}()
 
 	wg.Wait()
-}
-
-func (r Router) listen() {
-	addr := net.UDPAddr{
-		Port: 19000,
-		IP:   net.ParseIP(r.IP),
-		// IP: net.ParseIP("127.0.0.1"),
-	}
-
-	connection, err := net.ListenUDP("udp", &addr)
-	if err != nil {
-		fmt.Printf("Listen: Error to create udp connection %s", err)
-		return
-	}
-	defer connection.Close()
-
-	buf := make([]byte, 1024)
-
-	for {
-		n, remoteAddr, err := connection.ReadFromUDP(buf)
-		if err != nil {
-			fmt.Printf("Listen: Error reading udp buffer %s", err)
-			continue
-		}
-
-		fmt.Printf("Mensagem recebida de %v: %s\n", remoteAddr, string(buf[:n]))
-		// TODO: Fazer alguma coisa com a mensagem
-	}
-}
-
-func (r *Router) sendRouteUpdates() {
-	for {
-		time.Sleep(15 * time.Second)
-		message := formatRoutingMessage(r.RouteTable)
-		for destIP := range r.RouteTable {
-			r.sendMessage(destIP, message)
-		}
-	}
-}
-
-func (r *Router) sendMessage(destIP, message string) {
-	addr := net.UDPAddr{
-		Port: 19000,
-		IP:   net.ParseIP(destIP),
-	}
-	conn, err := net.DialUDP("udp", nil, &addr)
-	if err != nil {
-		fmt.Printf("sendMessage: Error to connect to client %v: %v\n", destIP, err)
-		return
-	}
-	defer conn.Close()
-
-	_, err = conn.Write([]byte(message))
-	if err != nil {
-		fmt.Printf("sendMessage: Error sending a message %v: %v\n", destIP, err)
-	}
-}
-
-// TODO: Gostaria que isso fosse uma função de protocol
-func formatRoutingMessage(routeTable map[string]Route) string {
-	var builder strings.Builder
-
-	for _, route := range routeTable {
-		fmt.Fprintf(&builder, "!%s:%d", route.DestIP, route.Metric)
-	}
-	return builder.String()
-}
-
-// INFO: Falar com o herter sobre a ordem das funções impactar no code sugestions
-func parserMessageToRouteTable(message string) (map[string]int, error) {
-	split_msg := strings.Split(message, "!")
-	route_table := make(map[string]int)
-
-	for _, route := range split_msg {
-		if route == "" {
-			continue
-		}
-
-		fields := strings.Split(route, ":")
-		if len(fields) != 2 {
-			return nil, errors.New("parserMessageToRouteTable: Invalid format for routing table message")
-		}
-
-		ip := fields[0]
-		metric, err := strconv.Atoi(fields[1])
-		if err != nil {
-			return nil, errors.New("parserMessageToRouteTable: Invalid format to metric in table message")
-		}
-
-		route_table[ip] = metric
-	}
-	return route_table, nil
-}
-
-func (r *Router) processMessage(message, ip_received string) {
-  route_table, err := parserMessageToRouteTable(message)
-  if err != nil {
-    fmt.Printf("processMessage: Error to parser message")
-    return
-  }
-
-  for new_ip, new_metric := range route_table {
-    found := false
-    for ip := range r.RouteTable {
-      if (new_ip == ip) {
-        found = true
-        break
-      }
-    }
-
-    if (!found) {
-      // Se não encontrou adiciona com uma nova metrica
-      r.AddRoute(new_ip, new_metric, ip_received)
-    } else {
-      // Se encontrou compara a metrica e atualiza
-      // Se a metrica for a mesma, não faz nada
-      if (new_metric != r.RouteTable[new_ip].Metric) {
-        r.UpdateRoute(new_ip, new_metric, ip_received)
-      }
-    }
-  }
 }
