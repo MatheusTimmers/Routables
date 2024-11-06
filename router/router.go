@@ -131,22 +131,30 @@ func parserMessageToRouteTable(message string) (map[string]int, error) {
 	return route_table, nil
 }
 
-func (r *Router) processMessage(message string) {
+func (r *Router) processMessage(message, ip_received string) {
   route_table, err := parserMessageToRouteTable(message)
   if err != nil {
-    fmt.Errorf("processMessage: Error to parser message")
+    fmt.Printf("processMessage: Error to parser message")
+    return
   }
 
   for new_ip, new_metric := range route_table {
-    // TODO: Verificar se teve novas adição, remoção ou atualização 
-    for ip, metric := range r.RouteTable {
+    found := false
+    for ip := range r.RouteTable {
       if (new_ip == ip) {
-        // mesmo destino, acho que ignora
-        found := true;
+        found = true
+        break
       }
+    }
 
-      if (!found) {
-        r.AddRoute()
+    if (!found) {
+      // Se não encontrou adiciona com uma nova metrica
+      r.AddRoute(new_ip, new_metric, ip_received)
+    } else {
+      // Se encontrou compara a metrica e atualiza
+      // Se a metrica for a mesma, não faz nada
+      if (new_metric != r.RouteTable[new_ip].Metric) {
+        r.UpdateRoute(new_ip, new_metric, ip_received)
       }
     }
   }
