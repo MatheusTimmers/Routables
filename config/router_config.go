@@ -42,7 +42,8 @@ func LoadRouterConfig(fileName, ip string) (*router.Router, error) {
 	for _, line := range lines {
 		// Carrega os roteadores vizinhos
 		if line != "" {
-			r.AddRoute(line, 1, line)
+      // 0, porque a metrica é incrementada no AddRoute
+			r.AddRoute(line, 0, line)
 		}
 	}
 	return r, nil

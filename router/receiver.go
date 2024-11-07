@@ -12,7 +12,6 @@ func (r *Router) listen() {
 	addr := net.UDPAddr{
 		Port: 19000,
 		IP:   net.ParseIP(r.IP),
-		// IP: net.ParseIP("127.0.0.1"),
 	}
 
 	connection, err := net.ListenUDP("udp", &addr)
@@ -33,7 +32,10 @@ func (r *Router) listen() {
 
 		fmt.Printf("Mensagem recebida de %v: %s\n", remoteAddr, string(buf[:n]))
 
-		r.processMessage(string(buf[:n]), remoteAddr.String())
+		// TODO: Verificar se a tabela alterou
+		changed := r.processMessage(string(buf[:n]), remoteAddr.String())
+
+		fmt.Printf("Tabela de roteamento atual: %s\n", r.ToString())
 	}
 }
 
@@ -62,7 +64,9 @@ func parserMessageToRouteTable(message string) (map[string]int, error) {
 	return route_table, nil
 }
 
-func (r *Router) processMessage(message, ip_received string) {
+// FIXME: Mutex não ficou bom
+func (r *Router) processMessage(message, ip_received string) (changed bool) {
+	changed = false
 	route_table, err := parserMessageToRouteTable(message)
 	if err != nil {
 		fmt.Printf("processMessage: Error to parser message")
@@ -73,17 +77,23 @@ func (r *Router) processMessage(message, ip_received string) {
 	defer r.mu.Unlock()
 
 	for new_ip, new_metric := range route_table {
-    _, exist := route_table[new_ip] 
+		_, exist := route_table[new_ip]
 
-		if !exist {
-			// Se não encontrou adiciona com uma nova metrica
-			r.AddRoute(new_ip, new_metric, ip_received)
+		if new_ip == r.IP {
+			// Encontrou voce mesmo, pule
+			continue
+		}
+
+		if exist {
+			// Se encontrou atualiza
+			r.UpdateRoute(new_ip, new_metric, ip_received)
+			changed = true
 		} else {
-			// Se encontrou compara a metrica e atualiza
-			// Se a metrica for a mesma, não faz nada
-			if new_metric != r.RouteTable[new_ip].Metric {
-				r.UpdateRoute(new_ip, new_metric, ip_received)
-			}
+			// Se não encontrou adiciona
+			r.AddRoute(new_ip, new_metric, ip_received)
+			changed = true
 		}
 	}
+
+	return
 }
