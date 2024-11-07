@@ -8,18 +8,29 @@ import (
 )
 
 // A cada 15 segundos envia uma mensagem
+// TODO: Código repetido, mover para uma função
 func (r *Router) sendRouteUpdates() {
 	for {
-		time.Sleep(15 * time.Second)
+		select {
+		case <-time.After(15 * time.Second):
+			r.mu.Lock()
 
-		r.mu.Lock()
+			message := formatRoutingMessage(r.RouteTable)
+			for destIP := range r.RouteTable {
+				r.sendMessage(destIP, message)
+			}
 
-		message := formatRoutingMessage(r.RouteTable)
-		for destIP := range r.RouteTable {
-			r.sendMessage(destIP, message)
+			r.mu.Unlock()
+		case <-r.HasChanged:
+			r.mu.Lock()
+
+			message := formatRoutingMessage(r.RouteTable)
+			for destIP := range r.RouteTable {
+				r.sendMessage(destIP, message)
+			}
+
+			r.mu.Unlock()
 		}
-
-		r.mu.Unlock()
 	}
 }
 

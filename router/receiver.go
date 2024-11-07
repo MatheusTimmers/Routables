@@ -32,8 +32,7 @@ func (r *Router) listen() {
 
 		fmt.Printf("Mensagem recebida de %v: %s\n", remoteAddr, string(buf[:n]))
 
-		// TODO: Verificar se a tabela alterou
-		changed := r.processMessage(string(buf[:n]), remoteAddr.String())
+		r.processMessage(string(buf[:n]), remoteAddr.String())
 
 		fmt.Printf("Tabela de roteamento atual: %s\n", r.ToString())
 	}
@@ -65,8 +64,7 @@ func parserMessageToRouteTable(message string) (map[string]int, error) {
 }
 
 // FIXME: Mutex não ficou bom
-func (r *Router) processMessage(message, ip_received string) (changed bool) {
-	changed = false
+func (r *Router) processMessage(message, ip_received string) {
 	route_table, err := parserMessageToRouteTable(message)
 	if err != nil {
 		fmt.Printf("processMessage: Error to parser message")
@@ -87,13 +85,9 @@ func (r *Router) processMessage(message, ip_received string) (changed bool) {
 		if exist {
 			// Se encontrou atualiza
 			r.UpdateRoute(new_ip, new_metric, ip_received)
-			changed = true
 		} else {
 			// Se não encontrou adiciona
 			r.AddRoute(new_ip, new_metric, ip_received)
-			changed = true
 		}
 	}
-
-	return
 }

@@ -11,6 +11,7 @@ type Router struct {
 	IP         string
 	RouteTable map[string]Route
 	mu         sync.Mutex
+	HasChanged chan bool
 }
 
 type Route struct {
@@ -36,6 +37,7 @@ func (r *Router) AddRoute(destIP string, metric int, nextHop string) {
 			NextHop:     nextHop,
 			LastUpdated: time.Now(),
 		}
+		r.HasChanged <- true
 	}
 }
 
@@ -52,6 +54,7 @@ func (r *Router) UpdateRoute(destIP string, metric int, nextHop string) {
 				NextHop:     nextHop,
 				LastUpdated: time.Now(),
 			}
+			r.HasChanged <- true
 		}
 	}
 }
@@ -60,14 +63,14 @@ func (r *Router) RemoveRoute(destIP string) {
 	delete(r.RouteTable, destIP)
 }
 
-func (r *Router) removeStaleRoutes() {
+func (r *Router) removeInactiveRoutes() {
 	for {
-    // verifica a cada 20 segundos
+		// verifica a cada 20 segundos
 		time.Sleep(20 * time.Second)
 
 		r.mu.Lock()
 		for destIP, route := range r.RouteTable {
-      time := time.Since(route.LastUpdated) - 35 * time.Second
+			time := time.Since(route.LastUpdated) - 35*time.Second
 			if time > 0 {
 				// Remove a rota se ela estiver inativa por mais de 35 segundos
 				fmt.Printf("Removendo rota inativa: %s por %d segundos\n", destIP, time)
@@ -105,7 +108,7 @@ func (r *Router) Start() {
 
 	go func() {
 		defer wg.Done()
-		r.removeStaleRoutes()
+		r.removeInactiveRoutes()
 	}()
 
 	wg.Wait()
