@@ -11,7 +11,7 @@ type Router struct {
 	IP         string
 	RouteTable map[string]Route
 	mu         sync.Mutex
-	HasChanged chan bool
+	HasChanged chan struct{}
 }
 
 type Route struct {
@@ -25,6 +25,7 @@ func NewRouter(ip string) *Router {
 	return &Router{
 		IP:         ip,
 		RouteTable: make(map[string]Route),
+    HasChanged: make(chan struct{}, 1),
 	}
 }
 
@@ -37,7 +38,7 @@ func (r *Router) AddRoute(destIP string, metric int, nextHop string) {
 			NextHop:     nextHop,
 			LastUpdated: time.Now(),
 		}
-		r.HasChanged <- true
+    r.tableChange()
 	}
 }
 
@@ -54,7 +55,7 @@ func (r *Router) UpdateRoute(destIP string, metric int, nextHop string) {
 				NextHop:     nextHop,
 				LastUpdated: time.Now(),
 			}
-			r.HasChanged <- true
+      r.tableChange()
 		}
 	}
 }
@@ -90,6 +91,13 @@ func (r *Router) ToString() string {
 	}
 
 	return builder.String()
+}
+
+func (r *Router) tableChange() {
+	select {
+	case r.HasChanged <- struct{}{}:
+	default:
+	}
 }
 
 func (r *Router) Start() {
