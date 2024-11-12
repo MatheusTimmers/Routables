@@ -9,7 +9,7 @@ import (
 
 // A cada 15 segundos envia uma mensagem
 // TODO: Código repetido, mover para uma função
-func (r *Router) sendRouteUpdates() {
+func (r *Router) sendRouteUpdates(addrl* net.UDPAddr) {
 	for {
 		select {
 		case <-time.After(15 * time.Second):
@@ -17,7 +17,7 @@ func (r *Router) sendRouteUpdates() {
 
 			message := formatRoutingMessage(r.RouteTable)
 			for destIP := range r.RouteTable {
-				r.sendMessage(destIP, message)
+				r.sendMessage(destIP, message, addrl)
 			}
 
 			r.mu.Unlock()
@@ -26,7 +26,7 @@ func (r *Router) sendRouteUpdates() {
 
 			message := formatRoutingMessage(r.RouteTable)
 			for destIP := range r.RouteTable {
-				r.sendMessage(destIP, message)
+				r.sendMessage(destIP, message, addrl)
 			}
 
 			r.mu.Unlock()
@@ -34,12 +34,12 @@ func (r *Router) sendRouteUpdates() {
 	}
 }
 
-func (r *Router) sendMessage(destIP, message string) {
+func (r *Router) sendMessage(destIP, message string, addrl* net.UDPAddr) {
 	addr := net.UDPAddr{
 		Port: 19000,
 		IP:   net.ParseIP(destIP),
 	}
-	conn, err := net.DialUDP("udp", nil, &addr)
+	conn, err := net.DialUDP("udp", addrl, &addr)
 	if err != nil {
 		fmt.Printf("sendMessage: Error to connect to client %v: %v\n", destIP, err)
 		return
@@ -53,7 +53,7 @@ func (r *Router) sendMessage(destIP, message string) {
 }
 
 // TODO: Gostaria que isso fosse uma função de protocol
-func formatRoutingMessage(routeTable map[string]Route) string {
+func formatRoutingMessage(routeTable map[string]*Route) string {
 	var builder strings.Builder
 
 	for _, route := range routeTable {

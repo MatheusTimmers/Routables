@@ -6,17 +6,13 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 )
 
-func (r *Router) listen() {
-	addr := net.UDPAddr{
-		Port: 19000,
-		IP:   net.ParseIP(r.IP),
-	}
-
-	connection, err := net.ListenUDP("udp", &addr)
+func (r *Router) listen(addrl* net.UDPAddr) {
+	connection, err := net.ListenUDP("udp", addrl)
 	if err != nil {
-		fmt.Printf("Listen: Error to create udp connection %s", err)
+    fmt.Printf("Listen: Error to create udp connection. Error: %s", err)
 		return
 	}
 	defer connection.Close()
@@ -30,11 +26,18 @@ func (r *Router) listen() {
 			continue
 		}
 
-		fmt.Printf("Mensagem recebida de %v: %s\n", remoteAddr, string(buf[:n]))
+		fmt.Printf("Mensagem recebida de %v: \n %s\n", remoteAddr.AddrPort().Addr(), string(buf[:n]))
 
-		r.processMessage(string(buf[:n]), remoteAddr.String())
+    // Nova mensagem, renova tabela do sender
+		err = r.renewRouter(remoteAddr.AddrPort().Addr().String())
+		if err != nil {
+			fmt.Printf("processMessage: " + err.Error())
+			continue
+		}
 
-		fmt.Printf("Tabela de roteamento atual: %s\n", r.ToString())
+		r.processMessage(string(buf[:n]), remoteAddr.AddrPort().Addr().String())
+
+		fmt.Printf("Tabela de roteamento atual:\n %s\n", r.ToString())
 	}
 }
 
@@ -77,11 +80,6 @@ func (r *Router) processMessage(message, ip_received string) {
 	for new_ip, new_metric := range route_table {
 		_, exist := route_table[new_ip]
 
-		if new_ip == r.IP {
-			// Encontrou voce mesmo, pule
-			continue
-		}
-
 		if exist {
 			// Se encontrou atualiza
 			r.UpdateRoute(new_ip, new_metric, ip_received)
@@ -89,5 +87,17 @@ func (r *Router) processMessage(message, ip_received string) {
 			// Se não encontrou adiciona
 			r.AddRoute(new_ip, new_metric, ip_received)
 		}
+	}
+}
+
+func (r *Router) renewRouter(ip_received string) error {
+	_, exist := r.RouteTable[ip_received]
+	if exist {
+		// Renova o LastUpdate
+		r.RouteTable[ip_received].LastUpdated = time.Now()
+		return nil
+	} else {
+		// Não conhecemos o sender, retorna erro
+		return fmt.Errorf("Unknown Sender \n")
 	}
 }

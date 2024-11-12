@@ -2,6 +2,7 @@ package router
 
 import (
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -9,7 +10,7 @@ import (
 
 type Router struct {
 	IP         string
-	RouteTable map[string]Route
+	RouteTable map[string]*Route
 	mu         sync.Mutex
 	HasChanged chan struct{}
 }
@@ -24,21 +25,21 @@ type Route struct {
 func NewRouter(ip string) *Router {
 	return &Router{
 		IP:         ip,
-		RouteTable: make(map[string]Route),
-    HasChanged: make(chan struct{}, 1),
+		RouteTable: make(map[string]*Route),
+		HasChanged: make(chan struct{}, 1),
 	}
 }
 
 func (r *Router) AddRoute(destIP string, metric int, nextHop string) {
 	_, exist := r.RouteTable[destIP]
 	if !exist {
-		r.RouteTable[destIP] = Route{
+		r.RouteTable[destIP] = &Route{
 			DestIP:      destIP,
 			Metric:      metric + 1,
 			NextHop:     nextHop,
 			LastUpdated: time.Now(),
 		}
-    r.tableChange()
+		r.tableChange()
 	}
 }
 
@@ -49,13 +50,9 @@ func (r *Router) UpdateRoute(destIP string, metric int, nextHop string) {
 		// TODO: Se recebemos uma metrica maior, acredito que o timestamp não deve
 		// Ser incrementado, já que não recebemos o real dono desse ip
 		if metric <= route.Metric {
-			r.RouteTable[destIP] = Route{
-				DestIP:      destIP,
-				Metric:      metric,
-				NextHop:     nextHop,
-				LastUpdated: time.Now(),
-			}
-      r.tableChange()
+			r.RouteTable[destIP].Metric = metric
+			r.RouteTable[destIP].NextHop = nextHop
+			r.tableChange()
 		}
 	}
 }
@@ -64,17 +61,19 @@ func (r *Router) RemoveRoute(destIP string) {
 	delete(r.RouteTable, destIP)
 }
 
+// TODO: Tem que remover as rotas dele e que passam por ele
 func (r *Router) removeInactiveRoutes() {
 	for {
-		// verifica a cada 20 segundos
-		time.Sleep(20 * time.Second)
+		// verifica a cada 10 segundos
+		time.Sleep(10 * time.Second)
 
 		r.mu.Lock()
 		for destIP, route := range r.RouteTable {
-			time := time.Since(route.LastUpdated) - 35*time.Second
-			if time > 0 {
+			timed := time.Since(route.LastUpdated) - 35*time.Second
+			fmt.Printf("timer %f \n", timed.Seconds())
+			if timed > 0 {
 				// Remove a rota se ela estiver inativa por mais de 35 segundos
-				fmt.Printf("Removendo rota inativa: %s por %d segundos\n", destIP, time)
+				fmt.Printf("Removendo rota inativa: %s por %f segundos\n", destIP, timed.Seconds())
 				r.RemoveRoute(destIP)
 			}
 		}
@@ -87,7 +86,9 @@ func (r *Router) ToString() string {
 	fmt.Fprintf(&builder, "Ip: %s\n", r.IP)
 
 	for _, route := range r.RouteTable {
-		fmt.Fprintf(&builder, "   route: %v\n", route)
+		fmt.Fprintf(&builder, "   Ip destino: %s\n", route.DestIP)
+		fmt.Fprintf(&builder, "      metrica: %d\n", route.Metric)
+		fmt.Fprintf(&builder, "        saida: %s\n", route.NextHop)
 	}
 
 	return builder.String()
@@ -101,17 +102,22 @@ func (r *Router) tableChange() {
 }
 
 func (r *Router) Start() {
+  addr := net.UDPAddr{
+		Port: 19000,
+		IP:   net.ParseIP(r.IP),
+	}
+
 	var wg sync.WaitGroup
 	wg.Add(3)
 
 	go func() {
 		defer wg.Done()
-		r.listen()
+		r.listen(&addr)
 	}()
 
 	go func() {
 		defer wg.Done()
-		r.sendRouteUpdates()
+		r.sendRouteUpdates(&addr)
 	}()
 
 	go func() {
