@@ -10,6 +10,7 @@ import (
 
 type Router struct {
 	IP         string
+	Conn       *net.UDPConn
 	RouteTable map[string]*Route
 	mu         sync.Mutex
 	HasChanged chan struct{}
@@ -102,22 +103,30 @@ func (r *Router) tableChange() {
 }
 
 func (r *Router) Start() {
-  addr := net.UDPAddr{
-		Port: 19000,
-		IP:   net.ParseIP(r.IP),
-	}
+	var (
+		addr = net.UDPAddr{
+			Port: 19000,
+			IP:   net.ParseIP(r.IP),
+		}
+		err error
+		wg  sync.WaitGroup
+	)
 
-	var wg sync.WaitGroup
 	wg.Add(3)
+
+	if r.Conn, err = net.ListenUDP("udp", &addr); err != nil {
+		fmt.Printf("Listen: Error to create udp connection. Error: %s", err)
+		return
+	}
 
 	go func() {
 		defer wg.Done()
-		r.listen(&addr)
+		r.listen()
 	}()
 
 	go func() {
 		defer wg.Done()
-		r.sendRouteUpdates(&addr)
+		r.sendRouteUpdates()
 	}()
 
 	go func() {

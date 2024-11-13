@@ -18,6 +18,5 @@ func main() {
 	}
 
   fmt.Printf("Iniciando sistema, tabela de roteamento carrega: %s", router.ToString())
-
 	router.Start()
 }

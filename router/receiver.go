@@ -3,39 +3,32 @@ package router
 import (
 	"errors"
 	"fmt"
-	"net"
 	"strconv"
 	"strings"
 	"time"
 )
 
-func (r *Router) listen(addrl* net.UDPAddr) {
-	connection, err := net.ListenUDP("udp", addrl)
-	if err != nil {
-    fmt.Printf("Listen: Error to create udp connection. Error: %s", err)
-		return
-	}
-	defer connection.Close()
-
+func (r *Router) listen() {
+  defer r.Conn.Close()
 	buf := make([]byte, 1024)
 
 	for {
-		n, remoteAddr, err := connection.ReadFromUDP(buf)
+		n, remoteAddr, err := r.Conn.ReadFromUDP(buf)
 		if err != nil {
 			fmt.Printf("Listen: Error reading udp buffer %s", err)
 			continue
 		}
 
-		fmt.Printf("Mensagem recebida de %v: \n %s\n", remoteAddr.AddrPort().Addr(), string(buf[:n]))
+		fmt.Printf("Mensagem recebida de %v: \n %s\n", remoteAddr.IP.String(), string(buf[:n]))
 
     // Nova mensagem, renova tabela do sender
-		err = r.renewRouter(remoteAddr.AddrPort().Addr().String())
+		err = r.renewRouter(remoteAddr.IP.String())
 		if err != nil {
 			fmt.Printf("processMessage: " + err.Error())
 			continue
 		}
 
-		r.processMessage(string(buf[:n]), remoteAddr.AddrPort().Addr().String())
+		r.processMessage(string(buf[:n]), remoteAddr.IP.String())
 
 		fmt.Printf("Tabela de roteamento atual:\n %s\n", r.ToString())
 	}
