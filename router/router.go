@@ -40,7 +40,7 @@ func (r *Router) AddRoute(destIP string, metric int, nextHop string) {
 			NextHop:     nextHop,
 			LastUpdated: time.Now(),
 		}
-		r.tableChange()
+		//r.tableChange()
 	}
 }
 
@@ -48,12 +48,10 @@ func (r *Router) UpdateRoute(destIP string, metric int, nextHop string) {
 	route, exist := r.RouteTable[destIP]
 	if exist {
 		// Se a metrica for menor, atualiza a tabela inteira
-		// TODO: Se recebemos uma metrica maior, acredito que o timestamp não deve
-		// Ser incrementado, já que não recebemos o real dono desse ip
-		if metric <= route.Metric {
+		if metric < route.Metric {
 			r.RouteTable[destIP].Metric = metric
 			r.RouteTable[destIP].NextHop = nextHop
-			r.tableChange()
+			// r.tableChange()
 		}
 	}
 }
@@ -70,6 +68,7 @@ func (r *Router) removeInactiveRoutes() {
 
 		r.mu.Lock()
 		for destIP, route := range r.RouteTable {
+      // TODO: Verificar metrica
 			timed := time.Since(route.LastUpdated) - 35*time.Second
 			fmt.Printf("timer %f \n", timed.Seconds())
 			if timed > 0 {
@@ -118,6 +117,12 @@ func (r *Router) Start() {
 		fmt.Printf("Listen: Error to create udp connection. Error: %s", err)
 		return
 	}
+
+  // TODO: Criar logica de pedir para o user se vai entrar em uma rede já existente
+  if false {
+    destIp := "teste"
+    sendStartupMessage(destIp, r)
+  }
 
 	go func() {
 		defer wg.Done()

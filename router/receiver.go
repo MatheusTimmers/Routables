@@ -71,7 +71,10 @@ func (r *Router) processMessage(message, ip_received string) {
 	defer r.mu.Unlock()
 
 	for new_ip, new_metric := range route_table {
-		_, exist := route_table[new_ip]
+    if new_ip == r.IP {
+      continue
+    }
+		_, exist := r.RouteTable[new_ip]
 
 		if exist {
 			// Se encontrou atualiza

@@ -16,8 +16,10 @@ func (r *Router) sendRouteUpdates() {
 			r.mu.Lock()
 
 			message := formatRoutingMessage(r.RouteTable)
-			for destIP := range r.RouteTable {
-				r.sendMessage(destIP, message)
+			for _, route := range r.RouteTable {
+				if route.Metric == 1 {
+					r.sendMessage(route.DestIP, message)
+				}
 			}
 
 			r.mu.Unlock()
@@ -39,12 +41,19 @@ func (r *Router) sendMessage(destIP, message string) {
 		Port: 19000,
 		IP:   net.ParseIP(destIP),
 	}
-	
-  _, err := r.Conn.WriteToUDP([]byte(message), &addr)
+
+	_, err := r.Conn.WriteToUDP([]byte(message), &addr)
 	if err != nil {
 		fmt.Printf("sendMessage: Error to connect to client %v: %v\n", destIP, err)
 		return
 	}
+}
+
+func sendStartupMessage(destIp string, r *Router) {
+	var builder strings.Builder
+	fmt.Fprintf(&builder, "@%s", r.IP)
+
+	r.sendMessage(destIp, builder.String())
 }
 
 // TODO: Gostaria que isso fosse uma função de protocol
