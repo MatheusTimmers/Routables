@@ -44,7 +44,7 @@ func (r *Router) sendMessage(destIP, message string) {
 
 	_, err := r.Conn.WriteToUDP([]byte(message), &addr)
 	if err != nil {
-		fmt.Printf("sendMessage: Error to connect to client %v: %v\n", destIP, err)
+    r.log(fmt.Sprintf("sendMessage: Error to connect to client %v: %v\n", destIP, err), true)
 		return
 	}
 }

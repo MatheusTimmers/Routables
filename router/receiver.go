@@ -15,22 +15,23 @@ func (r *Router) listen() {
 	for {
 		n, remoteAddr, err := r.Conn.ReadFromUDP(buf)
 		if err != nil {
-			fmt.Printf("Listen: Error reading udp buffer %s", err)
+      r.log(fmt.Sprintf("Listen: Error reading udp buffer. Error: %s", err), true)
 			continue
 		}
 
-		fmt.Printf("Mensagem recebida de %v: \n %s\n", remoteAddr.IP.String(), string(buf[:n]))
+		r.log(fmt.Sprintf("Mensagem recebida de %v: \n %s\n", remoteAddr.IP.String(), string(buf[:n])), false)
 
     // Nova mensagem, renova tabela do sender
 		err = r.renewRouter(remoteAddr.IP.String())
 		if err != nil {
-			fmt.Printf("processMessage: " + err.Error())
+			r.log(fmt.Sprintf("processMessage: " + err.Error()), true)
 			continue
 		}
 
 		r.processMessage(string(buf[:n]), remoteAddr.IP.String())
 
-		fmt.Printf("Tabela de roteamento atual:\n %s\n", r.ToString())
+    // TODO: Comentado - Remover
+    // fmt.Printf("Tabela de roteamento atual:\n %s\n", r.ToString())
 	}
 }
 
@@ -63,7 +64,7 @@ func parserMessageToRouteTable(message string) (map[string]int, error) {
 func (r *Router) processMessage(message, ip_received string) {
 	route_table, err := parserMessageToRouteTable(message)
 	if err != nil {
-		fmt.Printf("processMessage: Error to parser message")
+    r.log(fmt.Sprintf("processMessage: Error to parser message"), true)
 		return
 	}
 

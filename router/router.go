@@ -14,6 +14,7 @@ type Router struct {
 	RouteTable map[string]*Route
 	mu         sync.Mutex
 	HasChanged chan struct{}
+  logger func(string, bool)
 }
 
 type Route struct {
@@ -70,14 +71,26 @@ func (r *Router) removeInactiveRoutes() {
 		for destIP, route := range r.RouteTable {
       // TODO: Verificar metrica
 			timed := time.Since(route.LastUpdated) - 35*time.Second
-			fmt.Printf("timer %f \n", timed.Seconds())
+			r.log(fmt.Sprintf("timer %f \n", timed.Seconds()), false)
 			if timed > 0 {
 				// Remove a rota se ela estiver inativa por mais de 35 segundos
-				fmt.Printf("Removendo rota inativa: %s por %f segundos\n", destIP, timed.Seconds())
+				r.log(fmt.Sprintf("Removendo rota inativa: %s por %f segundos\n", destIP, timed.Seconds()), false)
 				r.RemoveRoute(destIP)
 			}
 		}
 		r.mu.Unlock()
+	}
+}
+
+func (r *Router) SetLogger(logger func(string, bool)) {
+	r.logger = logger
+}
+
+func (r *Router) log(message string, isError bool) {
+	if r.logger != nil {
+		r.logger(message, isError)
+	} else {
+		fmt.Println(message)
 	}
 }
 
@@ -114,7 +127,7 @@ func (r *Router) Start() {
 	wg.Add(3)
 
 	if r.Conn, err = net.ListenUDP("udp", &addr); err != nil {
-		fmt.Printf("Listen: Error to create udp connection. Error: %s", err)
+    r.log(fmt.Sprintf("Listen: Error to create udp connection. Error: %s", err), true)
 		return
 	}
 
