@@ -8,32 +8,26 @@ import (
 )
 
 // A cada 15 segundos envia uma mensagem
-// TODO: Código repetido, mover para uma função
 func (r *Router) sendRouteUpdates() {
 	for {
 		select {
 		case <-time.After(15 * time.Second):
-			r.mu.Lock()
-
-			message := formatRoutingMessage(r.RouteTable)
-			for _, route := range r.RouteTable {
-				if route.Metric == 1 {
-					r.sendMessage(route.DestIP, message)
-				}
-			}
-
-			r.mu.Unlock()
+			r.innerSendRouteUpdates()
 		case <-r.HasChanged:
-			r.mu.Lock()
-
-			message := formatRoutingMessage(r.RouteTable)
-			for destIP := range r.RouteTable {
-				r.sendMessage(destIP, message)
-			}
-
-			r.mu.Unlock()
+			r.innerSendRouteUpdates()
 		}
 	}
+}
+
+func (r *Router) innerSendRouteUpdates() {
+	r.mu.Lock()
+	message := formatRoutingMessage(r.RouteTable)
+	for _, route := range r.RouteTable {
+		if route.Metric == 1 {
+			r.sendMessage(route.DestIP, message)
+		}
+	}
+	r.mu.Unlock()
 }
 
 func (r *Router) sendMessage(destIP, message string) {
@@ -44,19 +38,27 @@ func (r *Router) sendMessage(destIP, message string) {
 
 	_, err := r.Conn.WriteToUDP([]byte(message), &addr)
 	if err != nil {
-    r.log(fmt.Sprintf("sendMessage: Error to connect to client %v: %v\n", destIP, err), true)
+		r.log(fmt.Sprintf("sendMessage: Error to connect to client %v: %v\n", destIP, err), true)
 		return
 	}
 }
 
-func sendStartupMessage(destIp string, r *Router) {
+func (r *Router) sendStartupMessageToAllNeighbor() {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "@%s", r.IP)
 
-	r.sendMessage(destIp, builder.String())
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for _, route := range r.RouteTable {
+		if route.Metric == 1 {
+			r.sendMessage(route.DestIP, builder.String())
+		}
+	}
 }
 
-// TODO: Gostaria que isso fosse uma função de protocol
+// INFO: Gostaria de ter criado um arquivo protocol.go, e que tivesse todos os parses
+// de mensagens lá, mas não consegui fazer ;-;
 func formatRoutingMessage(routeTable map[string]*Route) string {
 	var builder strings.Builder
 

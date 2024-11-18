@@ -3,12 +3,11 @@ package config
 import (
 	"fmt"
 	"os"
-	"routables/router"
 	"strings"
+  "routables/router"
 )
 
 /* func WriteRouteTable(file_name string, router router.Router) error {
-  // INFO: Pode ser alterado
 	file, err := os.OpenFile(file_name, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 
 	if err != nil {
@@ -32,7 +31,6 @@ import (
 */
 
 func LoadRouterConfig(fileName, ip string) (*router.Router, error) {
-	// TODO: Não entendi direito como deve ficar os arquivos, revisar
 	lines, err := readFile(fileName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load router config: %w", err)
