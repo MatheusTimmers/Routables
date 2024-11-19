@@ -44,7 +44,6 @@ func (r *Router) listen() {
 				continue
 			}
 
-      r.log(fmt.Sprintf("teste %s", split[1]), false)
 			if split[1] == r.IP {
         r.log(fmt.Sprintf("Mensagem recebida de %s: %s", split[0][1:], split[2]), false)
 			} else {
